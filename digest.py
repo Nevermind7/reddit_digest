@@ -1,8 +1,10 @@
 import praw
 import json
 from datetime import datetime as dt
+import time
 import smtplib
 from email.mime.text import MIMEText
+import OAuth2Util
 
 class DigestMailer():
     
@@ -21,15 +23,15 @@ class DigestMailer():
 class Digester():
     
     def __init__(self, settings, version):
-        self.user_agent = 'reddit_digest v{} by u/individual_throwaway'.format(version)
-        self.agent = praw.Reddit(user_agent=self.user_agent)
-        self.user = self.agent.get_redditor(settings['user'])
+        self.user_agent = 'digest for reddit v{} by u/individual_throwaway'.format(version)
+        self.r = praw.Reddit(user_agent=self.user_agent)
+        self.o = OAuth2Util.OAuth2Util(self.r)
     
     def get_karma(self):
-        return self.user.comment_karma
+        return self.r.get_me().comment_karma
     
     def get_subscriptions(self):
-        return self.user.get_multireddit()    
+        return list(self.r.get_my_subreddits())
 
 def load_settings():
     with open('settings.json', 'r') as _settings:
