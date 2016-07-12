@@ -1,3 +1,4 @@
 .project
 .pydevproject
 oauth.ini
+__pycache__/*
