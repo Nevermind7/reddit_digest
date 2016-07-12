@@ -11,7 +11,7 @@ class Digester():
     
     def __init__(self, user_agent, user_data, defaults):
         self.r = praw.Reddit(user_agent=user_agent)
-        self.o = OAuth2Util.OAuth2Util(self.r)
+        self.o = OAuth2Util.OAuth2Util(self.r, configfile='resources/oauth.ini')
         self.user_data = user_data
         self.defaults = defaults
             
@@ -40,12 +40,11 @@ class Digester():
         self.o.refresh()
         my_subs = [str(x) for x in self.r.get_my_subreddits()]
         my_non_defaults = [x for x in my_subs if x not in self.defaults]
-        print(my_non_defaults)
         for sub in my_non_defaults:
             sub = self.r.get_subreddit(sub)
             subs = sub.subscribers
             hot = [x for x in sub.get_hot(time='day', limit=3)]
-            print(sub, subs, hot)
+
 
 def load_user_data_from_db():
     columns = ['username', 'comment_karma', 'link_karma', 'mail']
@@ -58,7 +57,7 @@ def load_user_data_from_db():
 
 def load_default_subreddits():
     while True:
-        r = requests.get('https://reddit.com/subreddits/default.json').json()
+        defaults = requests.get('https://reddit.com/subreddits/default.json').json()
         if 'data' in defaults:
             break
         else:
@@ -70,10 +69,10 @@ def load_default_subreddits():
 def main():
     user_data = load_user_data_from_db()
     defaults = load_default_subreddits()
-    print(defaults)
     digest = Digester(USER_AGENT, user_data, defaults)
-    digest.get_3_hottest_submissions_last_day()
+    #digest.get_3_hottest_submissions_last_day()
     mail = DigestMailer(user_data)
+    mail.add_content(digest.get_karma_change())
     mail.send()
 
 VERSION = '0.1'
