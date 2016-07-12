@@ -1,34 +1,23 @@
 import praw
-from datetime import datetime as dt
-import smtplib
-from email.mime.text import MIMEText
 import OAuth2Util
 import sqlite3
-import json
 import requests
+import time
 
-class DigestMailer():
-    
-    def __init__(self, user_data):
-        self.user = user_data['username']
-        self.name = 'Reddit_Digest'
-        self.address = user_data['mail']
-        self.msg = MIMEText('test')
-        self.msg['Subject'] = 'Reddit digest for u/{} on {}'.format(self.user, 
-                                                                    str(dt.today()).split(' ')[0])
-    def send(self):
-        s = smtplib.SMTP('localhost')
-        s.sendmail(self.name, self.address, self.msg.as_string())
-        s.quit()
+from mailer import DigestMailer
 
 class Digester():
+    """Digester checks reddit for changes since the last run."""
     
-    def __init__(self, user_agent, user_data):
+    def __init__(self, user_agent, user_data, defaults):
         self.r = praw.Reddit(user_agent=user_agent)
         self.o = OAuth2Util.OAuth2Util(self.r)
         self.user_data = user_data
+        self.defaults = defaults
             
     def get_karma_change(self):
+        """Return the difference in comment and link karma since the
+           last database update."""
         self.o.refresh()
         comment_karma_old = self.user_data['comment_karma']
         self.comment_karma = self.r.get_me().comment_karma
@@ -39,6 +28,7 @@ class Digester():
                 self.link_karma - link_karma_old)
     
     def _update_user_db(self):
+        """Change the database entry for the user to the latest values."""
         with sqlite3.connect('resources/user_data.db') as conn:
             c = conn.cursor()
             c.execute("UPDATE users SET comment_karma=?, link_karma=?\
@@ -48,8 +38,10 @@ class Digester():
     
     def get_3_hottest_submissions_last_day(self):
         self.o.refresh()
-        subreddits = [str(x) for x in self.r.get_my_subreddits()]
-        for sub in subreddits:
+        my_subs = [str(x) for x in self.r.get_my_subreddits()]
+        my_non_defaults = [x for x in my_subs if x not in self.defaults]
+        print(my_non_defaults)
+        for sub in my_non_defaults:
             sub = self.r.get_subreddit(sub)
             subs = sub.subscribers
             hot = [x for x in sub.get_hot(time='day', limit=3)]
@@ -64,21 +56,25 @@ def load_user_data_from_db():
         data = c.fetchone()
         return {x: data[x] for x in columns}
 
-def load_default_subs():
-    r = requests.get('https://reddit.com/subreddits/default.json').json()
+def load_default_subreddits():
+    while True:
+        r = requests.get('https://reddit.com/subreddits/default.json').json()
+        if 'data' in defaults:
+            break
+        else:
+            time.sleep(2)
     defaults = [str(x['data']['url']).replace('/r/','').replace('/','') 
-                for x in r['data']['children']]
+                for x in defaults['data']['children']]
     return defaults
 
 def main():
     user_data = load_user_data_from_db()
-    default_subs = load_default_subs()
-    print(default_subs)
-    return
-    digest = Digester(USER_AGENT, user_data)
+    defaults = load_default_subreddits()
+    print(defaults)
+    digest = Digester(USER_AGENT, user_data, defaults)
     digest.get_3_hottest_submissions_last_day()
     mail = DigestMailer(user_data)
-    #mail.send()
+    mail.send()
 
 VERSION = '0.1'
 USER_AGENT = 'digest for reddit v{} by u/individual_throwaway'.format(VERSION)
