@@ -9,15 +9,17 @@ class DigestMailer():
         self.user = user_data['username']
         self.name = 'Reddit_Digest'
         self.address = user_data['mail']
-        self.content = ''
+        self.template = self._load_template()
+    
+    def _load_template(self):
+        with open('resources/mail_template', 'r') as template:
+            template = template.read()
+        return template
         
-    def send(self):
+    def send(self, digested):
         s = smtplib.SMTP('localhost')
-        self.msg = MIMEText(self.content)
-        self.msg['Subject'] = 'Reddit digest for u/{} on {}'.format(self.user, 
+        self.msg = MIMEText(self.template.format(**digested))
+        self.msg['Subject'] = 'Reddit digest for {} on {}'.format(self.user, 
                                                                     str(dt.today()).split(' ')[0])
         s.sendmail(self.name, self.address, self.msg.as_string())
         s.quit()
-        
-    def add_content(self, ext):
-        self.content += str(ext) + '\n\n'
