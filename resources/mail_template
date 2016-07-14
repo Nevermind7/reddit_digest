@@ -1,7 +1,6 @@
 Comment karma change:      {comment_karma}
 Link karma change:         {link_karma}
 
-The 3 hottest submissions from all your non-default subreddits are:
-{permalink1}
-{permalink2}
-{permalink3}
+The {amount_hot} hottest submissions from all your non-default subreddits are:
+
+{hot_submissions}

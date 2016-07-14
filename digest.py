@@ -49,27 +49,25 @@ class Digester():
                                            self.link_karma, 
                                            self.user_data['username']))
     
-    def get_3_hottest_submissions_last_day(self):
-        """Get the 3 hottest submissions from all non-default subreddits.
-           Upvotes are weighted with subscribers to allow smaller sub's 
-           submissions to make the list."""
+    def get_hottest_submissions_last_day(self, amount=5):
+        """Get the {amount} hottest submissions from all non-default subreddits."""
         self.o.refresh()
-        hot = []
-        weighted = {}
         my_subs = [str(x) for x in self.r.get_my_subreddits()]
-        my_non_defaults = [x for x in my_subs if x not in self.defaults]
-        for sub in my_non_defaults:
-            sub = self.r.get_subreddit(sub)
-            hot.extend([x for x in sub.get_hot(time='day', limit=3)])
-        sorted = self._sort_by_impact_factor(hot)
-        for x in [1,2,3]:
-            self.digested['permalink{}'.format(x)] = sorted[x-1].permalink
-        
-    def _sort_by_impact_factor(self, submissions):
-        """Takes a list of submissions and returns that list, sorted by the impact factor.
-           Impact factor is score / #subscribers."""
-        weighted = {post: post.score/post.subreddit.subscribers for post in submissions}
-        return sorted(weighted, key=weighted.get, reverse=True)
+        my_non_defaults = '+'.join([x for x in my_subs if x not in self.defaults])
+        subs = self.r.get_subreddit(my_non_defaults)
+        hot = [x for x in subs.get_hot(time='day', limit=amount)]
+        self.digested['amount_hot'] = amount
+        hot = ['{:20}: {}({})'.format(str(x.subreddit),
+                                   str(self._shorten(x.title)),
+                                   str(x.short_link)) for x in hot]
+        self.digested['hot_submissions'] = '\n'.join(hot)
+    
+    def _shorten(self, str):
+        if len(str) < 48:
+            return str
+        else:
+            return str[:48] + '...'
+                
 
 def load_user_data_from_db():
     columns = ['username', 'comment_karma', 'link_karma', 'mail']
@@ -84,7 +82,7 @@ def main():
     user_data = load_user_data_from_db()
     mail = DigestMailer(user_data)
     digest = Digester(USER_AGENT, user_data)
-    digest.get_3_hottest_submissions_last_day()
+    digest.get_hottest_submissions_last_day(amount=10)
     digest.get_karma_change()
     mail.send(digest.digested)
 
